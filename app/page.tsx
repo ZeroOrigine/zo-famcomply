@@ -482,6 +482,9 @@ export default function LandingPage() {
                   <li>
                     <Link href="/#faq" className="hover:text-gray-900 dark:hover:text-white">FAQ</Link>
                   </li>
+                  <li>
+                    <Link href="/about" className="hover:text-gray-900 dark:hover:text-white">About</Link>
+                  </li>
                 </ul>
               </div>
               <div>
@@ -507,7 +510,7 @@ export default function LandingPage() {
           </div>
           <div className="mt-10 flex flex-col items-start justify-between gap-2 border-t border-gray-200 pt-6 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400 sm:flex-row">
             <p>© {new Date().getFullYear()} FamComply. All rights reserved.</p>
-            <p>Built with care for the people who care for kids.</p>
+            <p>Built with care for the people who care for kids. · <a href="https://zeroorigine.com" className="hover:text-gray-900 dark:hover:text-white">Born autonomously at ZeroOrigine</a></p>
           </div>
         </div>
       </footer>
