@@ -118,19 +118,42 @@ export async function getEntitlementsClient(): Promise<Entitlements> {
       return { ...FREE_PLAN_FALLBACK, subscriptionStatus: 'none' };
     }
     const payload = (await response.json()) as Record<string, unknown>;
+    // QA-045 fix: /api/billing/subscription returns
+    // { subscription: { planSlug, status, ... }, plan: { ... } | null, isPro }.
+    // Parse that shape first; keep the legacy nested/flat shapes as fallbacks.
+    // Paid plan fields are honored only when the server says isPro (or the
+    // plan is free), mirroring resolveEntitlements' fail-closed behavior.
     const nested = payload.entitlements;
-    const source = (
+    const flat = (
       typeof nested === 'object' && nested !== null ? nested : payload
     ) as Record<string, unknown>;
-    const planSlug = source.planSlug ?? source.plan_slug;
-    const planName = source.planName ?? source.plan_name;
-    const allowsEmailReminders = source.allowsEmailReminders ?? source.allows_email_reminders;
-    const maxTrackedRequirements =
-      source.maxTrackedRequirements !== undefined
-        ? source.maxTrackedRequirements
-        : source.max_tracked_requirements;
+    const subscription = (
+      typeof payload.subscription === 'object' && payload.subscription !== null
+        ? payload.subscription
+        : {}
+    ) as Record<string, unknown>;
+    const plan = (
+      typeof payload.plan === 'object' && payload.plan !== null ? payload.plan : {}
+    ) as Record<string, unknown>;
+    const isPro = payload.isPro === true;
+    const rawPlanSlug = subscription.planSlug ?? flat.planSlug ?? flat.plan_slug;
+    const planUsable = isPro || rawPlanSlug === 'free' || rawPlanSlug === undefined;
+    const planSlug = planUsable ? rawPlanSlug : FREE_PLAN_FALLBACK.planSlug;
+    const planName = planUsable
+      ? plan.name ?? flat.planName ?? flat.plan_name
+      : FREE_PLAN_FALLBACK.planName;
+    const allowsEmailReminders = planUsable
+      ? plan.allowsEmailReminders ?? flat.allowsEmailReminders ?? flat.allows_email_reminders
+      : FREE_PLAN_FALLBACK.allowsEmailReminders;
+    const maxTrackedRequirements = planUsable
+      ? plan.maxTrackedRequirements !== undefined
+        ? plan.maxTrackedRequirements
+        : flat.maxTrackedRequirements !== undefined
+          ? flat.maxTrackedRequirements
+          : flat.max_tracked_requirements
+      : FREE_PLAN_FALLBACK.maxTrackedRequirements;
     const subscriptionStatus =
-      source.subscriptionStatus ?? source.subscription_status ?? source.status;
+      subscription.status ?? flat.subscriptionStatus ?? flat.subscription_status ?? flat.status;
     return {
       planSlug: typeof planSlug === 'string' ? planSlug : FREE_PLAN_FALLBACK.planSlug,
       planName: typeof planName === 'string' ? planName : FREE_PLAN_FALLBACK.planName,
