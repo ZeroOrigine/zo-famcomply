@@ -179,7 +179,7 @@ function LoginForm() {
             <button
               type="button"
               onClick={() => setShowPassword((s) => !s)}
-              className="absolute inset-y-0 right-0 px-3.5 text-xs font-semibold text-slate-500 transition hover:text-emerald-700"
+              className="absolute inset-y-0 right-0 min-w-[44px] px-3.5 text-xs font-semibold text-slate-500 transition hover:text-emerald-700"
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? 'Hide' : 'Show'}
