@@ -1,0 +1,23 @@
+{
+  "name": "FamComply",
+  "tagline": "Never lose a day of care because of a lapsed CPR card.",
+  "description": "Enter your state and license type to get a pre-built renewal timeline that bundles CPR, first aid, background check, and inspection prep in the correct sequence, with reminders so nothing catches you by surprise.",
+  "born": "2026-07-15T15:01:37.03592+00:00",
+  "research_score": 7.8,
+  "ethics_verdict": "APPROVED",
+  "ethics_score": 8.7,
+  "ethics_concerns": [
+    "Background check handling may involve sensitive PII if the tool stores results",
+    "Over-reliance risk if a reminder fails silently"
+  ],
+  "qa_score": 176,
+  "qa_max": 185,
+  "true_cost": 48.46,
+  "calls": 33,
+  "funders": [
+    "the founder"
+  ],
+  "story_url": "https://zeroorigine.com/story/famcomply",
+  "publisher": "ZeroOrigine",
+  "publisher_url": "https://zeroorigine.com"
+}
