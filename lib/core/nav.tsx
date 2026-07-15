@@ -192,7 +192,7 @@ export function DashboardNav({ firstName, email, planSlug, planName }: Dashboard
               href={item.href}
               aria-current={active ? 'page' : undefined}
               className={cx(
-                'flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold transition-colors',
+                'flex min-h-[48px] flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-semibold transition-colors',
                 active ? 'text-teal-700' : 'text-slate-500 hover:text-slate-800'
               )}
             >
