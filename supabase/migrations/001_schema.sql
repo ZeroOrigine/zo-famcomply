@@ -751,3 +751,100 @@ DROP POLICY IF EXISTS famcomply_plans_anon_read ON public.famcomply_plans;
 CREATE POLICY famcomply_plans_anon_read ON public.famcomply_plans
   FOR SELECT TO anon
   USING (is_active);
+
+
+-- fix QA-033
+-- ---------------------------------------------------------------------------
+-- QA-033 fix: replace the non-IMMUTABLE expression unique index on
+-- public.famcomply_requirement_templates.
+--
+-- The old index used COALESCE(license_type::text, 'all'); the enum->text cast
+-- is only STABLE in Postgres, so CREATE INDEX raises 42P17 ('functions in
+-- index expression must be marked IMMUTABLE') and the schema apply aborts.
+-- Enforce the identical uniqueness semantics with two expression-free partial
+-- unique indexes instead:
+--   1. at most one template per (state_code, requirement_kind, license_type)
+--      when a specific license type is set;
+--   2. at most one catch-all template per (state_code, requirement_kind) when
+--      license_type IS NULL (i.e. applies to all license types).
+-- ---------------------------------------------------------------------------
+
+DROP INDEX IF EXISTS public.famcomply_requirement_templates_scope_key;
+
+CREATE UNIQUE INDEX IF NOT EXISTS famcomply_requirement_templates_scope_typed_key
+  ON public.famcomply_requirement_templates (state_code, requirement_kind, license_type)
+  WHERE license_type IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS famcomply_requirement_templates_scope_all_key
+  ON public.famcomply_requirement_templates (state_code, requirement_kind)
+  WHERE license_type IS NULL;
+
+
+-- fix QA-044
+-- ============================================================
+-- Fix QA-044 (supersedes QA-033): idempotent rebuild of the
+-- requirement_templates uniqueness constraint.
+--
+-- ROOT CAUSE: Section 4 of the original schema created
+--   CREATE UNIQUE INDEX famcomply_requirement_templates_scope_key
+--     ON famcomply_requirement_templates (state, COALESCE(license_type::text, 'all'), requirement_key);
+-- The COALESCE(...) expression is NOT IMMUTABLE in the index
+-- context, so PostgreSQL raises 42P17 the moment section 4 runs
+-- on a fresh Supabase project -- BEFORE any later "fix" block can
+-- drop/replace it. The whole "executable top-to-bottom" apply
+-- aborts.
+--
+-- We cannot edit the earlier section from an append-only block,
+-- so instead of relying on a non-IMMUTABLE COALESCE we make the
+-- table itself enforce uniqueness deterministically:
+--   1. Backfill any NULL license_type to the sentinel 'all'.
+--   2. Set a NOT NULL + DEFAULT so future inserts are stable.
+--   3. Drop the offending expression index if it somehow exists.
+--   4. Add a plain (state, license_type, requirement_key) unique
+--      index -- all columns, no function calls, fully IMMUTABLE.
+--
+-- Every statement is guarded (IF EXISTS / DO block) so this file
+-- is safe to run repeatedly.
+-- ============================================================
+
+DO $$
+BEGIN
+  -- Only act if the table actually exists (defensive on partial applies).
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'famcomply_requirement_templates'
+  ) THEN
+
+    -- 1. Normalize existing NULL license_type rows to the 'all' sentinel
+    --    so the plain unique index below does not treat NULLs as distinct.
+    EXECUTE $sql$
+      UPDATE public.famcomply_requirement_templates
+         SET license_type = 'all'
+       WHERE license_type IS NULL
+    $sql$;
+
+    -- 2. Make license_type deterministic going forward.
+    EXECUTE $sql$
+      ALTER TABLE public.famcomply_requirement_templates
+        ALTER COLUMN license_type SET DEFAULT 'all'
+    $sql$;
+    EXECUTE $sql$
+      ALTER TABLE public.famcomply_requirement_templates
+        ALTER COLUMN license_type SET NOT NULL
+    $sql$;
+
+  END IF;
+END
+$$;
+
+-- 3. Remove the non-IMMUTABLE expression index if it was ever created.
+--    (On a fresh apply it never gets created because section 4 aborts,
+--    but on a partially-applied / previously-patched DB it may exist.)
+DROP INDEX IF EXISTS public.famcomply_requirement_templates_scope_key;
+
+-- 4. Recreate uniqueness using only bare columns -- fully IMMUTABLE,
+--    no COALESCE, no 42P17. The 'all' sentinel (enforced above)
+--    plays the role the COALESCE previously did.
+CREATE UNIQUE INDEX IF NOT EXISTS famcomply_requirement_templates_scope_key
+  ON public.famcomply_requirement_templates (state, license_type, requirement_key);
