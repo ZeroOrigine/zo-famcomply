@@ -8,6 +8,7 @@ const LINKS = [
   { href: '/#features', label: 'Features' },
   { href: '/pricing', label: 'Pricing' },
   { href: '/#faq', label: 'FAQ' },
+  { href: '/about', label: 'About' },
 ]
 
 function Mark() {
