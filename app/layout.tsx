@@ -40,6 +40,14 @@ export const metadata: Metadata = {
       'A sequenced renewal timeline for family child care providers, built from your state and license type, with reminders before every deadline.',
     siteName: 'FamComply',
     type: 'website',
+    images: [
+      {
+        url: '/og.png',
+        width: 1200,
+        height: 630,
+        alt: 'FamComply: sequenced license renewal timelines for family child care providers',
+      },
+    ],
   },
 }
 
