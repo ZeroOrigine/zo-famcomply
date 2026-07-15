@@ -242,6 +242,14 @@ async function runDailyJob(request: NextRequest) {
     const failedIds: string[] = [];
     const canceledIds: string[] = [];
 
+    // Pre-classify every reminder first so the parallel send phase below
+    // holds only rows that truly need an email.
+    const sendQueue: Array<{
+      reminderId: string;
+      recipientEmail: string;
+      email: ReminderEmail;
+    }> = [];
+
     for (const reminder of dueReminders) {
       const requirement = normalizeEmbedded(reminder.requirement);
 
@@ -272,12 +280,32 @@ async function runDailyJob(request: NextRequest) {
         expiresOnIso: requirement.expires_on,
       });
 
-      const delivered = await sendEmail(resendApiKey, recipientEmail, email);
-      if (delivered) {
-        sentIds.push(reminder.id);
-      } else {
-        failedIds.push(reminder.id);
-      }
+      sendQueue.push({ reminderId: reminder.id, recipientEmail, email });
+    }
+
+    // QA-034: send in parallel chunks instead of one awaited call per row.
+    // Up to 200 sequential sends can push the cron run past the serverless
+    // timeout on busy days; chunks of 10 keep wall time low without
+    // hammering the Resend API. Promise.allSettled ensures one bad send
+    // never sinks the rest of its chunk.
+    const SEND_CHUNK_SIZE = 10;
+    for (let offset = 0; offset < sendQueue.length; offset += SEND_CHUNK_SIZE) {
+      const chunk = sendQueue.slice(offset, offset + SEND_CHUNK_SIZE);
+      const settled = await Promise.allSettled(
+        chunk.map((item) => sendEmail(resendApiKey, item.recipientEmail, item.email))
+      );
+      settled.forEach((result, index) => {
+        const reminderId = chunk[index].reminderId;
+        if (result.status === 'fulfilled' && result.value === true) {
+          sentIds.push(reminderId);
+        } else {
+          if (result.status === 'rejected') {
+            // sendEmail catches its own errors, so a rejection is unexpected.
+            console.error('[famcomply] Email send rejected unexpectedly:', result.reason);
+          }
+          failedIds.push(reminderId);
+        }
+      });
     }
 
     const nowIso = new Date().toISOString();
