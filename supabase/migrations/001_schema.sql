@@ -204,8 +204,8 @@ CREATE INDEX famcomply_profiles_email_idx
 CREATE INDEX famcomply_profiles_state_license_idx
   ON public.famcomply_profiles (state_code, license_type);
 
-CREATE UNIQUE INDEX famcomply_requirement_templates_scope_key
-  ON public.famcomply_requirement_templates (state_code, requirement_kind, COALESCE(license_type::text, 'all'));
+-- [manual fix 2026-07-15, Cowork] Removed non-IMMUTABLE COALESCE expression index (42P17).
+-- Uniqueness is enforced by the two partial unique indexes in the 'fix QA-033' block below.
 CREATE INDEX famcomply_requirement_templates_lookup_idx
   ON public.famcomply_requirement_templates (state_code, license_type);
 
@@ -780,71 +780,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS famcomply_requirement_templates_scope_all_key
   WHERE license_type IS NULL;
 
 
--- fix QA-044
--- ============================================================
--- Fix QA-044 (supersedes QA-033): idempotent rebuild of the
--- requirement_templates uniqueness constraint.
---
--- ROOT CAUSE: Section 4 of the original schema created
---   CREATE UNIQUE INDEX famcomply_requirement_templates_scope_key
---     ON famcomply_requirement_templates (state, COALESCE(license_type::text, 'all'), requirement_key);
--- The COALESCE(...) expression is NOT IMMUTABLE in the index
--- context, so PostgreSQL raises 42P17 the moment section 4 runs
--- on a fresh Supabase project -- BEFORE any later "fix" block can
--- drop/replace it. The whole "executable top-to-bottom" apply
--- aborts.
---
--- We cannot edit the earlier section from an append-only block,
--- so instead of relying on a non-IMMUTABLE COALESCE we make the
--- table itself enforce uniqueness deterministically:
---   1. Backfill any NULL license_type to the sentinel 'all'.
---   2. Set a NOT NULL + DEFAULT so future inserts are stable.
---   3. Drop the offending expression index if it somehow exists.
---   4. Add a plain (state, license_type, requirement_key) unique
---      index -- all columns, no function calls, fully IMMUTABLE.
---
--- Every statement is guarded (IF EXISTS / DO block) so this file
--- is safe to run repeatedly.
--- ============================================================
-
-DO $$
-BEGIN
-  -- Only act if the table actually exists (defensive on partial applies).
-  IF EXISTS (
-    SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public'
-      AND table_name = 'famcomply_requirement_templates'
-  ) THEN
-
-    -- 1. Normalize existing NULL license_type rows to the 'all' sentinel
-    --    so the plain unique index below does not treat NULLs as distinct.
-    EXECUTE $sql$
-      UPDATE public.famcomply_requirement_templates
-         SET license_type = 'all'
-       WHERE license_type IS NULL
-    $sql$;
-
-    -- 2. Make license_type deterministic going forward.
-    EXECUTE $sql$
-      ALTER TABLE public.famcomply_requirement_templates
-        ALTER COLUMN license_type SET DEFAULT 'all'
-    $sql$;
-    EXECUTE $sql$
-      ALTER TABLE public.famcomply_requirement_templates
-        ALTER COLUMN license_type SET NOT NULL
-    $sql$;
-
-  END IF;
-END
-$$;
-
--- 3. Remove the non-IMMUTABLE expression index if it was ever created.
---    (On a fresh apply it never gets created because section 4 aborts,
---    but on a partially-applied / previously-patched DB it may exist.)
-DROP INDEX IF EXISTS public.famcomply_requirement_templates_scope_key;
-
--- 4. Recreate uniqueness using only bare columns -- fully IMMUTABLE,
---    no COALESCE, no 42P17. The 'all' sentinel (enforced above)
---    plays the role the COALESCE previously did.
-CREATE UNIQUE INDEX IF NOT EXISTS famcomply_requirement_templates_scope_key
-  ON public.famcomply_requirement_templates (state, license_type, requirement_key);
+-- [manual fix 2026-07-15, Cowork] Deleted the broken 'fix QA-044' append block:
+-- it referenced non-existent columns (state, requirement_key) and the invalid enum label 'all'.
+-- The 'fix QA-033' partial unique indexes above are the correct and sufficient fix.
