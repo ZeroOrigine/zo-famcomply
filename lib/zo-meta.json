@@ -10,10 +10,10 @@
     "Background check handling may involve sensitive PII if the tool stores results",
     "Over-reliance risk if a reminder fails silently"
   ],
-  "qa_score": 176,
+  "qa_score": 181,
   "qa_max": 185,
-  "true_cost": 48.46,
-  "calls": 33,
+  "true_cost": 66.28,
+  "calls": 53,
   "funders": [
     "the founder"
   ],
