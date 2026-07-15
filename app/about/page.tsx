@@ -106,9 +106,20 @@ export default function AboutPage() {
           A human answers:{' '}
           <a href='mailto:hello@zeroorigine.com' className='font-semibold text-emerald-700 hover:underline dark:text-emerald-400'>hello@zeroorigine.com</a>
         </p>
-        <p className='mt-2 text-base leading-7 text-gray-600 dark:text-gray-400'>
-          Want your name on the next product&apos;s birth certificate?{' '}
-          <a href='https://zeroorigine.com/join' className='font-semibold text-emerald-700 hover:underline dark:text-emerald-400'>Fund a birth</a>.
+        <h2 className='mt-12 text-xl font-bold tracking-tight'>Put your name on something that did not exist</h2>
+        <p className='mt-4 text-base leading-7 text-gray-600 dark:text-gray-400'>
+          The machine keeps its own ledger, so it knows the exact cost of one act of creation. If you
+          want, you can fund the next one. Pay what you believe, from a single dollar. Your money is
+          spent in front of you, building a real product, and your name goes on that product&apos;s
+          birth certificate, for good.
+        </p>
+        <p className='mt-6'>
+          <a
+            href='https://zeroorigine.com/join'
+            className='inline-flex items-center gap-2 rounded-lg bg-gray-900 px-5 py-3 text-sm font-semibold text-white hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200'
+          >
+            Fund a birth on ZeroOrigine &#8599;
+          </a>
         </p>
 
         <div className='mt-12'>
