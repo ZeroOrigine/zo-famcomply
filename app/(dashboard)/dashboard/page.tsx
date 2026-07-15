@@ -630,6 +630,7 @@ export default function DashboardPage() {
                 const busy = savingId === item.id
                 return (
                   <li key={item.id} id={`req-${item.id}`} className="relative pl-12">
+                    <span className="sr-only">Step {index + 1}</span>
                     {index < items.length - 1 && (
                       <span aria-hidden="true" className="absolute -bottom-3 left-4 top-12 w-px bg-slate-200" />
                     )}
