@@ -1,5 +1,5 @@
 // CANONICAL: OAuth and PKCE code exchange handler at /auth/callback.
-// Google and GitHub sign-ins land here, as do confirmation emails that use
+// Google sign-ins land here, as do confirmation emails that use
 // the default Supabase {{ .ConfirmationURL }} template. Exchanges the code
 // for a session cookie, then sends the user on to their destination.
 
