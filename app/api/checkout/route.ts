@@ -117,7 +117,7 @@ async function startCheckout(planInput: unknown, intervalInput: unknown): Promis
   // Mind). Env vars are only a fallback. Nothing is hardcoded.
   const { data: planRow, error: planError } = await supabase
     .from('famcomply_plans')
-    .select('slug, price_monthly_cents, stripe_price_id_monthly, stripe_price_id_yearly, is_active')
+    .select('slug, name, price_monthly_cents, price_yearly_cents, stripe_price_id_monthly, stripe_price_id_yearly, is_active')
     .eq('slug', plan)
     .eq('is_active', true)
     .maybeSingle()
@@ -137,7 +137,13 @@ async function startCheckout(planInput: unknown, intervalInput: unknown): Promis
   const priceId =
     (interval === 'yearly' ? planRow.stripe_price_id_yearly : planRow.stripe_price_id_monthly) || envFallback
 
-  if (!priceId) {
+  // #240: a missing Stripe price id is no longer a dead end. The central proxy
+  // (checkout v4) turns the plan FACTS below into a real recurring price by
+  // lookup key — the same repair that revived LienClock's checkout. Every
+  // stripe_price_id column in the fleet was NULL, so this 503 fired for every
+  // user who ever clicked upgrade.
+  const amountCents = interval === 'yearly' ? planRow.price_yearly_cents : planRow.price_monthly_cents
+  if (!priceId && (!Number.isInteger(amountCents) || amountCents < 50)) {
     return {
       ok: false,
       status: 503,
@@ -166,7 +172,21 @@ async function startCheckout(planInput: unknown, intervalInput: unknown): Promis
         'Content-Type': 'application/json',
         Authorization: `Bearer ${proxyToken}`,
       },
-      body: JSON.stringify({ product_slug: PRODUCT_SLUG, price_id: priceId, user_id: user.id }),
+      body: JSON.stringify(
+        priceId
+          ? { product_slug: PRODUCT_SLUG, price_id: priceId, user_id: user.id, plan_code: `${plan}_${interval}`, user_email: user.email }
+          : {
+              product_slug: PRODUCT_SLUG,
+              price_id: `${plan}_${interval}`,
+              plan_code: `${plan}_${interval}`,
+              amount_cents: amountCents,
+              currency: 'usd',
+              product_name: `FamComply ${planRow.name}`,
+              interval,
+              user_id: user.id,
+              user_email: user.email,
+            }
+      ),
       cache: 'no-store',
       signal: controller.signal,
     })
