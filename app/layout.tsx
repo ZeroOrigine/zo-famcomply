@@ -2,6 +2,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Outfit, Source_Sans_3 } from 'next/font/google'
 import './globals.css'
+import ZoAuthFragmentBridge from '@/components/ZoAuthFragmentBridge'
 
 const displayFont = Outfit({
   subsets: ['latin'],
@@ -54,7 +55,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${displayFont.variable} ${bodyFont.variable}`}>
-      <body className="min-h-screen bg-white text-slate-900 antialiased">{children}</body>
+      <body className="min-h-screen bg-white text-slate-900 antialiased">
+        <ZoAuthFragmentBridge />{children}</body>
     </html>
   )
 }
